@@ -1,0 +1,65 @@
+---
+interface Props {
+  title?: string;
+}
+
+const { title = "QA Upskill" } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <style is:global>
+      :root {
+        color-scheme: dark;
+        --bg: #07110c;
+        --bg-elevated: rgba(13, 28, 20, 0.86);
+        --bg-panel: rgba(18, 37, 27, 0.92);
+        --line: rgba(107, 255, 173, 0.14);
+        --line-strong: rgba(107, 255, 173, 0.28);
+        --text: #eefcf3;
+        --text-soft: #9fc4ad;
+        --brand: #63f29f;
+        --brand-strong: #2dcc73;
+        --danger: #ff7b81;
+        --shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background:
+          radial-gradient(circle at top left, rgba(32, 117, 66, 0.35), transparent 32%),
+          radial-gradient(circle at top right, rgba(54, 179, 126, 0.18), transparent 24%),
+          linear-gradient(180deg, #08120d 0%, #06100b 56%, #030805 100%);
+        color: var(--text);
+      }
+
+      body {
+        min-height: 100vh;
+      }
+
+      a {
+        color: var(--brand);
+      }
+
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+    </style>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>

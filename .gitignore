@@ -1,0 +1,6 @@
+node_modules
+dist
+.astro
+apps/api/data/*.db
+apps/api/data/*.db-*
+.DS_Store

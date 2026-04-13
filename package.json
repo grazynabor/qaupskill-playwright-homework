@@ -1,0 +1,19 @@
+{
+  "name": "qa-upskill",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c green,cyan \"npm run dev -w apps/api\" \"npm run dev -w apps/web\"",
+    "build": "npm run build -w apps/api && npm run build -w apps/web",
+    "check": "npm run check -w apps/api && npm run check -w apps/web",
+    "reset-db": "npm run reset-db -w apps/api"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.3"
+  }
+}

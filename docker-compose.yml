@@ -1,0 +1,33 @@
+services:
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - CLIENT_ORIGIN=http://localhost:4321
+    volumes:
+      - api-data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        - PUBLIC_API_URL=http://localhost:4000
+    ports:
+      - "4321:4321"
+    environment:
+      - HOST=0.0.0.0
+    depends_on:
+      - api
+
+volumes:
+  api-data:
