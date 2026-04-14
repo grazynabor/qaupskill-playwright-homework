@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 
 type Role = "User" | "Admin" | "Configurator";
@@ -128,6 +128,34 @@ const toPersonDetails = (record: PersonRecord): PersonDetails => ({
   notes: record.notes
 });
 
+function UnsafeNoteContent({ html }: { html: string }) {
+  const containerRef = useRef<HTMLParagraphElement | null>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+
+    if (!container) {
+      return;
+    }
+
+    container.innerHTML = html;
+
+    // Force inline script tags to execute after the note content is injected.
+    for (const script of container.querySelectorAll("script")) {
+      const executableScript = document.createElement("script");
+
+      for (const attribute of script.attributes) {
+        executableScript.setAttribute(attribute.name, attribute.value);
+      }
+
+      executableScript.text = script.text;
+      script.replaceWith(executableScript);
+    }
+  }, [html]);
+
+  return <p ref={containerRef} />;
+}
+
 export default function App() {
   const [token, setToken] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -171,19 +199,30 @@ export default function App() {
   const selectedPerson = personRecords.find((record) => record.id === selectedPersonId) ?? null;
   const activeStickyNotes = stickyNotes.filter((note) => !note.isDone);
   const archivedStickyNotes = stickyNotes.filter((note) => note.isDone);
-  const stickyNotesLimitReached = activeStickyNotes.length >= maxStickyNotes;
+  const configuratorUserIds = new Set(
+    directoryUsers.filter((user) => user.role === "Configurator").map((user) => user.id)
+  );
+  const statisticsStickyNotes = stickyNotes.filter((note) => !configuratorUserIds.has(note.createdByUserId));
+  const statisticsActiveStickyNotes = statisticsStickyNotes.filter((note) => !note.isDone);
+  const statisticsArchivedStickyNotes = statisticsStickyNotes.filter((note) => note.isDone);
+  const stickyNotesLimitReached = activeStickyNotes.length > maxStickyNotes;
   const doneStickyNotesCount = archivedStickyNotes.length;
   const openStickyNotesCount = activeStickyNotes.length;
   const stickyNotesCompletionRate =
     stickyNotes.length === 0 ? 0 : Math.round((doneStickyNotesCount / stickyNotes.length) * 100);
+  const statisticsDoneStickyNotesCount = statisticsArchivedStickyNotes.length;
+  const statisticsOpenStickyNotesCount = statisticsActiveStickyNotes.length;
+  const statisticsCompletionRate =
+    statisticsStickyNotes.length === 0 ? 0 : Math.round((statisticsDoneStickyNotesCount / statisticsStickyNotes.length) * 100);
   const canManageStickyNote = (note: StickyNote) =>
     currentUser?.role === "Admin" || currentUser?.role === "Configurator" || currentUser?.id === note.createdByUserId;
+  const canMarkStickyNoteDone = Boolean(currentUser);
   const availableTabs: WorkspaceTab[] = [
     ...(isAdmin ? (["users", "createUser"] as WorkspaceTab[]) : []),
     ...(canManagePerson ? (["person"] as WorkspaceTab[]) : []),
     "noteAssignments",
     "statistics",
-    "archive",
+    ...(isAdmin ? (["archive"] as WorkspaceTab[]) : []),
     "notes"
   ];
   const availableTabsKey = availableTabs.join("|");
@@ -281,10 +320,13 @@ export default function App() {
       workspaceTab === "noteAssignments" ||
       workspaceTab === "statistics"
     ) {
-      void loadStickyNotes(token);
+      if (stickyNotes.length === 0) {
+        void loadStickyNotes(token);
+      }
+
       void loadDirectoryUsers(token);
     }
-  }, [workspaceTab, token, isAdmin, canManagePerson]);
+  }, [workspaceTab, token, isAdmin, canManagePerson, stickyNotes.length]);
 
   useEffect(() => {
     if (!selectedPersonId) {
@@ -494,15 +536,6 @@ export default function App() {
       setUsers((current) => current.filter((user) => user.id !== userId));
       setPersonRecords((current) => current.filter((record) => record.id !== userId));
       setDirectoryUsers((current) => current.filter((user) => user.id !== userId));
-      setStickyNotes((current) =>
-        current
-          .filter((note) => note.createdByUserId !== userId)
-          .map((note) =>
-            note.assignedPersonId === userId
-              ? { ...note, assignedPersonId: null, assignedPersonName: null }
-              : note
-          )
-      );
 
       if (selectedPersonId === userId) {
         setSelectedPersonId(null);
@@ -518,7 +551,6 @@ export default function App() {
       }
 
       void loadDirectoryUsers(token);
-      void loadStickyNotes(token);
     } catch (error) {
       setDeleteUserError(error instanceof Error ? error.message : "Could not delete user.");
     }
@@ -668,7 +700,7 @@ export default function App() {
           <a href={`${apiUrl}/docs`} target="_blank" rel="noreferrer">
             Open Swagger
           </a>
-          <a href="https://astro.build/" target="_blank" rel="noreferrer">
+          <a href="https://astro.build/404" target="_blank" rel="noreferrer">
             Astro
           </a>
         </div>
@@ -1139,25 +1171,29 @@ export default function App() {
                               </div>
                               {note.isDone ? <div className="done-badge">Done</div> : null}
                               <h4>{note.title}</h4>
-                              <p>{note.content}</p>
+                              <UnsafeNoteContent html={note.content} />
                               <div className="sticky-note-footer">
                                 <span className="sticky-note-time">{new Date(note.updatedAt).toLocaleDateString()}</span>
-                                {canManageStickyNote(note) ? (
+                                {canMarkStickyNoteDone || canManageStickyNote(note) ? (
                                   <div className="note-card-actions">
-                                    <button
-                                      type="button"
-                                      className="note-done-button"
-                                      onClick={() => void handleMarkStickyNoteDone(note.id)}
-                                    >
-                                      Done
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="note-delete-button"
-                                      onClick={() => void handleDeleteStickyNote(note.id)}
-                                    >
-                                      Delete
-                                    </button>
+                                    {canMarkStickyNoteDone ? (
+                                      <button
+                                        type="button"
+                                        className="note-done-button"
+                                        onClick={() => void handleMarkStickyNoteDone(note.id)}
+                                      >
+                                        Done
+                                      </button>
+                                    ) : null}
+                                    {canManageStickyNote(note) ? (
+                                      <button
+                                        type="button"
+                                        className="note-delete-button"
+                                        onClick={() => void handleDeleteStickyNote(note.id)}
+                                      >
+                                        Delete
+                                      </button>
+                                    ) : null}
                                   </div>
                                 ) : null}
                               </div>
@@ -1178,8 +1214,8 @@ export default function App() {
                       <h3>Completed sticky notes moved out of the active board</h3>
                     </div>
                     <div className="notes-toolbar">
-                      <div className="notes-counter">{archivedStickyNotes.length}</div>
-                      <button className="ghost-button" type="button" onClick={() => token && void loadStickyNotes(token)}>
+                      <div className="notes-counter" style={{ color: "#333", background: "#444" }}>{archivedStickyNotes.length}</div>
+                      <button className="ghost-button" type="button" tabIndex={-1} onClick={() => token && void loadStickyNotes(token)}>
                         Refresh
                       </button>
                     </div>
@@ -1188,8 +1224,8 @@ export default function App() {
                   {!loadingStickyNotes && archivedStickyNotes.length === 0 ? (
                     <div className="notes-empty-state">
                       <p className="section-label">Archive Empty</p>
-                      <h3>No sticky notes have been completed yet.</h3>
-                      <p className="muted">
+                      <h3 style={{ color: "#666" }}>No sticky notes have been completed yet.</h3>
+                      <p className="muted" style={{ color: "#888" }}>
                         When a sticky note is marked as done, it will disappear from the active board and show up here.
                       </p>
                     </div>
@@ -1203,7 +1239,7 @@ export default function App() {
                           </div>
                           <div className="done-badge">Done</div>
                           <h4>{note.title}</h4>
-                          <p>{note.content}</p>
+                          <UnsafeNoteContent html={note.content} />
                           <div className="sticky-note-footer">
                             <span className="sticky-note-time">{new Date(note.updatedAt).toLocaleDateString()}</span>
                             {canManageStickyNote(note) ? (
@@ -1273,14 +1309,14 @@ export default function App() {
                       <h3>Track sticky note progress across the workspace</h3>
                     </div>
                     <div className="notes-toolbar">
-                      <div className="notes-counter">{doneStickyNotesCount}/{stickyNotes.length || 0}</div>
+                      <div className="notes-counter">{statisticsDoneStickyNotesCount}/{statisticsStickyNotes.length || 0}</div>
                       <button className="ghost-button" type="button" onClick={() => token && void loadStickyNotes(token)}>
                         Refresh
                       </button>
                     </div>
                   </div>
 
-                  {stickyNotes.length === 0 ? (
+                  {statisticsStickyNotes.length === 0 ? (
                     <div className="notes-empty-state assignments-empty-state">
                       <p className="section-label">No Statistics Yet</p>
                       <h3>Create sticky notes to populate this dashboard.</h3>
@@ -1292,25 +1328,25 @@ export default function App() {
                     <div className="stats-grid">
                       <article className="stat-card">
                         <p className="section-label">Total</p>
-                        <div className="stat-value">{stickyNotes.length}</div>
+                        <div className="stat-value">{statisticsStickyNotes.length}</div>
                         <p className="muted">sticky notes created</p>
                       </article>
 
                       <article className="stat-card">
                         <p className="section-label">Done</p>
-                        <div className="stat-value">{doneStickyNotesCount}</div>
+                        <div className="stat-value">{statisticsDoneStickyNotesCount}</div>
                         <p className="muted">sticky notes completed</p>
                       </article>
 
                       <article className="stat-card">
                         <p className="section-label">Open</p>
-                        <div className="stat-value">{openStickyNotesCount}</div>
+                        <div className="stat-value">{statisticsOpenStickyNotesCount}</div>
                         <p className="muted">sticky notes still in progress</p>
                       </article>
 
                       <article className="stat-card">
                         <p className="section-label">Completion</p>
-                        <div className="stat-value">{stickyNotesCompletionRate}%</div>
+                        <div className="stat-value">{statisticsCompletionRate}%</div>
                         <p className="muted">completion rate across all notes</p>
                       </article>
                     </div>

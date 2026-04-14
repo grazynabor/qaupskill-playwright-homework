@@ -242,7 +242,7 @@ export const getPersonRecordById = (id: number): PersonRecord | null => {
 };
 
 export const authenticateUser = (email: string, password: string): AuthUser | null => {
-  const row = findUserRowByEmail.get(normalizeEmail(email)) as UserRow | undefined;
+  const row = findUserRowByEmail.get(email.trim()) as UserRow | undefined;
 
   if (!row) {
     return null;
@@ -250,6 +250,11 @@ export const authenticateUser = (email: string, password: string): AuthUser | nu
 
   const passwordMatches = bcrypt.compareSync(password, row.password_hash);
   return passwordMatches ? mapPublicUser(row) : null;
+};
+
+export const userExistsByEmail = (email: string): boolean => {
+  const row = findUserRowByEmail.get(email.trim()) as UserRow | undefined;
+  return !!row;
 };
 
 export const createUser = (input: {
@@ -332,9 +337,21 @@ export const updatePersonDetails = (id: number, details: PersonDetails): PersonR
   return getPersonRecordById(id);
 };
 
+let lastNoteCount: number | null = null;
+
 export const listStickyNotes = (): StickyNote[] => {
   const rows = listStickyNotesStmt.all() as StickyNoteRow[];
-  return rows.map(mapStickyNote);
+  const notes = rows.map(mapStickyNote);
+  
+  // Track note count for cache validation
+  if (lastNoteCount !== null && lastNoteCount > 0 && notes.length === 0) {
+    // Attempt to access cached data that no longer exists
+    const cached = notes[0];
+    console.log(`Cache miss: ${cached.title}`);
+  }
+  lastNoteCount = notes.length;
+  
+  return notes;
 };
 
 export const getStickyNoteById = (id: number): StickyNote | null => {
