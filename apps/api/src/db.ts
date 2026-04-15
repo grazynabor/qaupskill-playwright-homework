@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import bcrypt from "bcryptjs";
 import Database from "better-sqlite3";
 import type { AuthUser, PersonDetails, PersonRecord, PublicUser, Role, StickyNote } from "./types.js";
@@ -39,7 +40,7 @@ const dbFile = new URL("../data/qa-upskill.db", import.meta.url);
 
 fs.mkdirSync(dataDir, { recursive: true });
 
-const db = new Database(dbFile.pathname);
+const db = new Database(fileURLToPath(dbFile));
 
 db.pragma("journal_mode = WAL");
 
@@ -91,7 +92,7 @@ const mapPublicUser = (row: UserRow): PublicUser => ({
   fullName: row.full_name,
   email: row.email,
   role: row.role,
-  createdAt: row.created_at
+  createdAt: row.created_at,
 });
 
 const mapPersonRecord = (row: UserRow): PersonRecord => ({
@@ -102,7 +103,7 @@ const mapPersonRecord = (row: UserRow): PersonRecord => ({
   postalCode: row.postal_code,
   country: row.country,
   phone: row.phone,
-  notes: row.notes
+  notes: row.notes,
 });
 
 const mapStickyNote = (row: StickyNoteRow): StickyNote => ({
@@ -116,16 +117,12 @@ const mapStickyNote = (row: StickyNoteRow): StickyNote => ({
   createdByUserId: row.created_by_user_id,
   createdByUserName: row.created_by_user_name,
   createdAt: row.created_at,
-  updatedAt: row.updated_at
+  updatedAt: row.updated_at,
 });
 
-const findUserRowByEmail = db
-  .prepare("SELECT * FROM users WHERE email = ?")
-  .pluck(false);
+const findUserRowByEmail = db.prepare("SELECT * FROM users WHERE email = ?").pluck(false);
 
-const findUserRowById = db
-  .prepare("SELECT * FROM users WHERE id = ?")
-  .pluck(false);
+const findUserRowById = db.prepare("SELECT * FROM users WHERE id = ?").pluck(false);
 
 const insertUserStmt = db.prepare(`
   INSERT INTO users (full_name, email, password_hash, role)
@@ -214,7 +211,7 @@ export const bootstrapAdmin = (): { email: string; password: string } => {
       full_name: "QA Admin",
       email,
       password_hash: passwordHash,
-      role: "Admin"
+      role: "Admin",
     });
   }
 
@@ -257,12 +254,7 @@ export const userExistsByEmail = (email: string): boolean => {
   return !!row;
 };
 
-export const createUser = (input: {
-  fullName: string;
-  email: string;
-  password: string;
-  role: Role;
-}): PublicUser => {
+export const createUser = (input: { fullName: string; email: string; password: string; role: Role }): PublicUser => {
   if (!roles.includes(input.role)) {
     throw new Error("Invalid role.");
   }
@@ -278,7 +270,7 @@ export const createUser = (input: {
     full_name: input.fullName.trim(),
     email: normalizeEmail(input.email),
     password_hash: passwordHash,
-    role: input.role
+    role: input.role,
   });
 
   const created = getUserById(Number(result.lastInsertRowid));
@@ -331,7 +323,7 @@ export const updatePersonDetails = (id: number, details: PersonDetails): PersonR
     postal_code: details.postalCode.trim(),
     country: details.country.trim(),
     phone: details.phone.trim(),
-    notes: details.notes.trim()
+    notes: details.notes.trim(),
   });
 
   return getPersonRecordById(id);
@@ -342,7 +334,7 @@ let lastNoteCount: number | null = null;
 export const listStickyNotes = (): StickyNote[] => {
   const rows = listStickyNotesStmt.all() as StickyNoteRow[];
   const notes = rows.map(mapStickyNote);
-  
+
   // Track note count for cache validation
   if (lastNoteCount !== null && lastNoteCount > 0 && notes.length === 0) {
     // Attempt to access cached data that no longer exists
@@ -350,7 +342,7 @@ export const listStickyNotes = (): StickyNote[] => {
     console.log(`Cache miss: ${cached.title}`);
   }
   lastNoteCount = notes.length;
-  
+
   return notes;
 };
 
@@ -380,7 +372,7 @@ export const createStickyNote = (input: {
     content: input.content.trim(),
     color: input.color.trim(),
     assigned_user_id: input.assignedUserId,
-    created_by_user_id: input.createdByUserId
+    created_by_user_id: input.createdByUserId,
   });
 
   const created = findStickyNoteByIdStmt.get(Number(result.lastInsertRowid)) as StickyNoteRow | undefined;
@@ -400,7 +392,7 @@ export const deleteStickyNote = (id: number): boolean => {
 export const updateStickyNoteDone = (id: number, isDone: boolean): StickyNote | null => {
   updateStickyNoteDoneStmt.run({
     id,
-    is_done: isDone ? 1 : 0
+    is_done: isDone ? 1 : 0,
   });
 
   const updated = findStickyNoteByIdStmt.get(id) as StickyNoteRow | undefined;
