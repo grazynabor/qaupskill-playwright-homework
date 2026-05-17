@@ -2,7 +2,7 @@ import cors from "cors";
 import express from "express";
 import swaggerUi from "swagger-ui-express";
 import { z } from "zod";
-import { authenticate, issueToken, requireAdmin, requireAdminOrConfigurator } from "./auth.js";
+import { authenticate, invalidateToken, issueToken, requireAdmin, requireAdminOrConfigurator } from "./auth.js";
 import {
   authenticateUser,
   bootstrapAdmin,
@@ -18,8 +18,7 @@ import {
   listUsers,
   updateStickyNoteDone,
   updatePersonDetails,
-  updateUserRole,
-  userExistsByEmail
+  updateUserRole
 } from "./db.js";
 import { createOpenApiSpec } from "./swagger.js";
 import type { AuthUser, StickyNote } from "./types.js";
@@ -37,7 +36,9 @@ const loginSchema = z.object({
 const createPersonSchema = z.object({
   fullName: z.string().trim().min(2).max(120),
   email: z.string().email(),
-  password: z.string().min(8).max(100),
+  password: z.string().min(8).max(100).refine((val) => val.trim().length > 0, {
+    message: "Password cannot be only whitespace."
+  }),
   role: z.enum(roles)
 });
 
@@ -59,9 +60,13 @@ const stickyNoteColors = ["#19352a", "#26482d", "#3b5c29", "#4d5b1f", "#3f2a4c"]
 const maxStickyNotes = 10;
 
 const createStickyNoteSchema = z.object({
-  title: z.string().min(2).max(80),
-  content: z.string().min(2).max(600),
-  color: z.enum(stickyNoteColors).nullable(),
+  title: z.string().min(2).max(80).refine((val) => val.trim().length >= 2, {
+    message: "Title must contain at least 2 non-whitespace characters."
+  }),
+  content: z.string().min(2).max(600).refine((val) => val.trim().length >= 2, {
+    message: "Content must contain at least 2 non-whitespace characters."
+  }),
+  color: z.enum(stickyNoteColors),
   assignedUserId: z.number().int().positive().nullable()
 });
 
@@ -94,17 +99,12 @@ app.post("/auth/login", (request, response) => {
     return;
   }
 
-  const emailExists = userExistsByEmail(parsed.data.email);
-
-  if (!emailExists) {
-    response.status(401).json({ message: "User not found." });
-    return;
-  }
-
-  const user = authenticateUser(parsed.data.email, parsed.data.password);
+  const normalizedEmail = parsed.data.email.trim().toLowerCase();
+  
+  const user = authenticateUser(normalizedEmail, parsed.data.password);
 
   if (!user) {
-    response.status(401).json({ message: `Invalid password: ${parsed.data.password}` });
+    response.status(401).json({ message: "Invalid email or password." });
     return;
   }
 
@@ -112,6 +112,15 @@ app.post("/auth/login", (request, response) => {
     token: issueToken(user),
     user
   });
+});
+
+app.post("/auth/logout", authenticate, (request, response) => {
+  const authorization = request.header("authorization");
+  if (authorization?.startsWith("Bearer ")) {
+    const token = authorization.slice("Bearer ".length).trim();
+    invalidateToken(token);
+  }
+  response.status(204).send();
 });
 
 app.get("/auth/me", authenticate, (request, response) => {
@@ -147,7 +156,7 @@ app.post("/people", authenticate, requireAdmin, (request, response) => {
   }
 });
 
-app.patch("/people/:id/role", authenticate, (request, response) => {
+app.patch("/people/:id/role", authenticate, requireAdmin, (request, response) => {
   const id = Number(request.params.id);
   const parsed = updateRoleSchema.safeParse(request.body);
 
@@ -175,7 +184,7 @@ app.patch("/people/:id/role", authenticate, (request, response) => {
   }
 });
 
-app.delete("/people/:id", authenticate, requireAdminOrConfigurator, (request, response) => {
+app.delete("/people/:id", authenticate, requireAdmin, (request, response) => {
   const id = Number(request.params.id);
 
   if (!Number.isInteger(id) || id < 1) {
@@ -240,29 +249,7 @@ app.put("/person-records/:id", authenticate, requireAdminOrConfigurator, (reques
   }
 });
 
-let notesRequestCount = 0;
-let notesRequestTimer: ReturnType<typeof setTimeout> | null = null;
-
 app.get("/notes", authenticate, (_request, response) => {
-  notesRequestCount++;
-  
-  if (notesRequestTimer) {
-    clearTimeout(notesRequestTimer);
-  }
-  
-  notesRequestTimer = setTimeout(() => {
-    notesRequestCount = 0;
-    notesRequestTimer = null;
-  }, 1000);
-  
-  if (notesRequestCount > 5) {
-    const notes = listStickyNotes();
-    // Race condition: access element that does not exist during concurrent requests
-    const firstNote = notes[notes.length];
-    response.json([{ ...firstNote, _debug: firstNote.title.toUpperCase() }]);
-    return;
-  }
-  
   response.json(listStickyNotes());
 });
 
@@ -274,7 +261,7 @@ app.post("/notes", authenticate, (request, response) => {
     return;
   }
 
-  if (countStickyNotes() > maxStickyNotes) {
+  if (countStickyNotes() >= maxStickyNotes) {
     response.status(409).json({ message: `Sticky note limit reached (${maxStickyNotes}).` });
     return;
   }
@@ -348,7 +335,7 @@ app.patch("/notes/:id/done", authenticate, (request, response) => {
     return;
   }
 
-  if (!request.authUser) {
+  if (!request.authUser || !canManageStickyNote(request.authUser, stickyNote)) {
     response.status(403).json({ message: "Only the note creator, Admin, or Configurator can update sticky note status." });
     return;
   }

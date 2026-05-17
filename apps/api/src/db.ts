@@ -314,16 +314,21 @@ export const listPersonRecords = (): PersonRecord[] => {
   return rows.map(mapPersonRecord);
 };
 
-export const updatePersonDetails = (id: number, details: PersonDetails): PersonRecord | null => {
+export const updatePersonDetails = (id: number, details: Partial<PersonDetails>): PersonRecord | null => {
+  const existing = getPersonRecordById(id);
+  if (!existing) {
+    return null;
+  }
+  
   updatePersonDetailsStmt.run({
     id,
-    address_line1: details.addressLine1.trim(),
-    address_line2: details.addressLine2.trim(),
-    city: details.city.trim(),
-    postal_code: details.postalCode.trim(),
-    country: details.country.trim(),
-    phone: details.phone.trim(),
-    notes: details.notes.trim(),
+    address_line1: (details.addressLine1 ?? existing.addressLine1).trim(),
+    address_line2: (details.addressLine2 ?? existing.addressLine2).trim(),
+    city: (details.city ?? existing.city).trim(),
+    postal_code: (details.postalCode ?? existing.postalCode).trim(),
+    country: (details.country ?? existing.country).trim(),
+    phone: (details.phone ?? existing.phone).trim(),
+    notes: (details.notes ?? existing.notes).trim(),
   });
 
   return getPersonRecordById(id);
@@ -335,12 +340,6 @@ export const listStickyNotes = (): StickyNote[] => {
   const rows = listStickyNotesStmt.all() as StickyNoteRow[];
   const notes = rows.map(mapStickyNote);
 
-  // Track note count for cache validation
-  if (lastNoteCount !== null && lastNoteCount > 0 && notes.length === 0) {
-    // Attempt to access cached data that no longer exists
-    const cached = notes[0];
-    console.log(`Cache miss: ${cached.title}`);
-  }
   lastNoteCount = notes.length;
 
   return notes;

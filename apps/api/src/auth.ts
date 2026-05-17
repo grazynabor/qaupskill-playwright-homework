@@ -5,6 +5,8 @@ import type { AuthUser } from "./types.js";
 const jwtSecret = process.env.JWT_SECRET ?? "qa-upskill-dev-secret-change-me";
 const tokenExpiry = "8h";
 
+const tokenBlacklist = new Set<string>();
+
 type TokenPayload = {
   user: AuthUser;
 };
@@ -13,6 +15,10 @@ export const issueToken = (user: AuthUser): string =>
   jwt.sign({ user }, jwtSecret, {
     expiresIn: tokenExpiry
   });
+
+export const invalidateToken = (token: string): void => {
+  tokenBlacklist.add(token);
+};
 
 export const authenticate = (request: Request, response: Response, next: NextFunction) => {
   const authorization = request.header("authorization");
@@ -23,6 +29,11 @@ export const authenticate = (request: Request, response: Response, next: NextFun
   }
 
   const token = authorization.slice("Bearer ".length).trim();
+
+  if (tokenBlacklist.has(token)) {
+    response.status(401).json({ message: "Token has been invalidated." });
+    return;
+  }
 
   try {
     const decoded = jwt.verify(token, jwtSecret) as TokenPayload;

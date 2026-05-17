@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 
 type Role = "User" | "Admin" | "Configurator";
@@ -128,32 +128,14 @@ const toPersonDetails = (record: PersonRecord): PersonDetails => ({
   notes: record.notes
 });
 
-function UnsafeNoteContent({ html }: { html: string }) {
-  const containerRef = useRef<HTMLParagraphElement | null>(null);
-
-  useEffect(() => {
-    const container = containerRef.current;
-
-    if (!container) {
-      return;
-    }
-
-    container.innerHTML = html;
-
-    // Force inline script tags to execute after the note content is injected.
-    for (const script of container.querySelectorAll("script")) {
-      const executableScript = document.createElement("script");
-
-      for (const attribute of script.attributes) {
-        executableScript.setAttribute(attribute.name, attribute.value);
-      }
-
-      executableScript.text = script.text;
-      script.replaceWith(executableScript);
-    }
-  }, [html]);
-
-  return <p ref={containerRef} />;
+function SafeNoteContent({ html }: { html: string }) {
+  const sanitizedHtml = html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
+    .replace(/on\w+\s*=\s*[^\s>]+/gi, '')
+    .replace(/javascript:/gi, '');
+  
+  return <p dangerouslySetInnerHTML={{ __html: sanitizedHtml }} />;
 }
 
 export default function App() {
@@ -217,12 +199,13 @@ export default function App() {
   const canManageStickyNote = (note: StickyNote) =>
     currentUser?.role === "Admin" || currentUser?.role === "Configurator" || currentUser?.id === note.createdByUserId;
   const canMarkStickyNoteDone = Boolean(currentUser);
+  const canViewArchive = currentUser?.role === "Admin" || currentUser?.role === "Configurator";
   const availableTabs: WorkspaceTab[] = [
     ...(isAdmin ? (["users", "createUser"] as WorkspaceTab[]) : []),
     ...(canManagePerson ? (["person"] as WorkspaceTab[]) : []),
     "noteAssignments",
     "statistics",
-    ...(isAdmin ? (["archive"] as WorkspaceTab[]) : []),
+    ...(canViewArchive ? (["archive"] as WorkspaceTab[]) : []),
     "notes"
   ];
   const availableTabsKey = availableTabs.join("|");
@@ -551,6 +534,7 @@ export default function App() {
       }
 
       void loadDirectoryUsers(token);
+      void loadStickyNotes(token);
     } catch (error) {
       setDeleteUserError(error instanceof Error ? error.message : "Could not delete user.");
     }
@@ -1171,7 +1155,7 @@ export default function App() {
                               </div>
                               {note.isDone ? <div className="done-badge">Done</div> : null}
                               <h4>{note.title}</h4>
-                              <UnsafeNoteContent html={note.content} />
+                              <SafeNoteContent html={note.content} />
                               <div className="sticky-note-footer">
                                 <span className="sticky-note-time">{new Date(note.updatedAt).toLocaleDateString()}</span>
                                 {canMarkStickyNoteDone || canManageStickyNote(note) ? (
@@ -1214,8 +1198,8 @@ export default function App() {
                       <h3>Completed sticky notes moved out of the active board</h3>
                     </div>
                     <div className="notes-toolbar">
-                      <div className="notes-counter" style={{ color: "#333", background: "#444" }}>{archivedStickyNotes.length}</div>
-                      <button className="ghost-button" type="button" tabIndex={-1} onClick={() => token && void loadStickyNotes(token)}>
+                      <div className="notes-counter" style={{ color: "#fff", background: "#555" }}>{archivedStickyNotes.length}</div>
+                      <button className="ghost-button" type="button" aria-label="Refresh archived notes" onClick={() => token && void loadStickyNotes(token)}>
                         Refresh
                       </button>
                     </div>
@@ -1224,22 +1208,22 @@ export default function App() {
                   {!loadingStickyNotes && archivedStickyNotes.length === 0 ? (
                     <div className="notes-empty-state">
                       <p className="section-label">Archive Empty</p>
-                      <h3 style={{ color: "#666" }}>No sticky notes have been completed yet.</h3>
-                      <p className="muted" style={{ color: "#888" }}>
+                      <h3>No sticky notes have been completed yet.</h3>
+                      <p className="muted">
                         When a sticky note is marked as done, it will disappear from the active board and show up here.
                       </p>
                     </div>
                   ) : (
-                    <div className="notes-grid">
+                    <div className="notes-grid" role="list" aria-label="Archived sticky notes">
                       {archivedStickyNotes.map((note) => (
-                        <article className="sticky-note-card done" key={note.id} style={{ background: note.color }}>
+                        <article className="sticky-note-card done" key={note.id} style={{ background: note.color }} role="listitem" tabIndex={0}>
                           <div className="sticky-note-meta">
                             <span>{note.assignedPersonName ?? "Unassigned"}</span>
                             <span>{note.createdByUserName}</span>
                           </div>
                           <div className="done-badge">Done</div>
                           <h4>{note.title}</h4>
-                          <UnsafeNoteContent html={note.content} />
+                          <SafeNoteContent html={note.content} />
                           <div className="sticky-note-footer">
                             <span className="sticky-note-time">{new Date(note.updatedAt).toLocaleDateString()}</span>
                             {canManageStickyNote(note) ? (
@@ -1247,6 +1231,7 @@ export default function App() {
                                 <button
                                   type="button"
                                   className="note-delete-button"
+                                  aria-label={`Delete note: ${note.title}`}
                                   onClick={() => void handleDeleteStickyNote(note.id)}
                                 >
                                   Delete
