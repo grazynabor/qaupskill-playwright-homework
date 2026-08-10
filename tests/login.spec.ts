@@ -1,6 +1,8 @@
 import { test, expect } from '../fixtures';
 
-const API_BASE_URL = 'http://localhost:4000';
+const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:4000';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@qaupskill.local';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'Admin123!';
 
 type Role = 'User' | 'Admin' | 'Configurator';
 
@@ -30,8 +32,8 @@ let testUserId: number | undefined;
 test.beforeAll(async ({ request }) => {
   const adminLoginResponse = await request.post(`${API_BASE_URL}/auth/login`, {
     data: {
-      email: 'admin@qaupskill.local',
-      password: 'Admin123!',
+      email: ADMIN_EMAIL,
+      password: ADMIN_PASSWORD,
     },
   });
 

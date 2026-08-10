@@ -1,9 +1,10 @@
+import 'dotenv/config';
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
   use: {
-    baseURL: 'http://localhost:4321',
+    baseURL: process.env.BASE_URL ?? 'http://localhost:4321',
   },
   projects: [
     {
