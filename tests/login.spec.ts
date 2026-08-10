@@ -4,6 +4,13 @@ const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:4000';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@qaupskill.local';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'Admin123!';
 
+test.use({
+  storageState: {
+    cookies: [],
+    origins: [],
+  },
+});
+
 type Role = 'User' | 'Admin' | 'Configurator';
 
 type PersonResponse = {
