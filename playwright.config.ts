@@ -6,6 +6,10 @@ const authFile = path.resolve(__dirname, 'playwright', '.auth', 'admin.json');
 
 export default defineConfig({
   testDir: './tests',
+  reporter: [
+    ['list'],
+    ['html', { outputFolder: 'playwright-report', open: 'never' }],
+  ],
   use: {
     baseURL: process.env.BASE_URL ?? 'http://localhost:4321',
   },
