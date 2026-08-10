@@ -12,6 +12,7 @@
     "reset-db": "npm run reset-db -w apps/api"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "^25.6.0",
     "concurrently": "^9.2.1",
     "typescript": "^5.9.3"
