@@ -1,0 +1,3 @@
+interface:
+  display_name: "Playwright Reviewer"
+  short_description: "Review Playwright changes for correctness, flakiness, and commit readiness."
