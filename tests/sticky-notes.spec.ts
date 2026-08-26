@@ -83,6 +83,7 @@ test(
         const createdNote: StickyNoteResponse = await createNoteResponse.json();
 
         expect(createdNote.id).toBeGreaterThan(0);
+        expect(createdNote).toMatchObject({ title, content });
         createdNoteId = createdNote.id;
       });
 

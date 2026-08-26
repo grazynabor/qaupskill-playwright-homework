@@ -35,9 +35,18 @@ type Credentials = {
   password: string;
 };
 
+type DefaultLandingExpectation = {
+  tab: Extract<
+    WorkspaceNavigationLabel,
+    'Users' | 'Person' | 'Note Assignments'
+  >;
+  sectionHeading: string;
+};
+
 type RoleScenario = {
   role: Role;
   credentials: Credentials;
+  defaultLanding: DefaultLandingExpectation;
   allowedNavigation: WorkspaceNavigationLabel[];
   restrictedNavigation: WorkspaceNavigationLabel[];
 };
@@ -67,6 +76,10 @@ const roleScenarios: RoleScenario[] = [
       email: ADMIN_EMAIL,
       password: ADMIN_PASSWORD,
     },
+    defaultLanding: {
+      tab: 'Users',
+      sectionHeading: 'Manage existing user accounts',
+    },
     allowedNavigation: [
       'Users',
       'Create User',
@@ -81,6 +94,10 @@ const roleScenarios: RoleScenario[] = [
   {
     role: 'Configurator',
     credentials: temporaryAccounts.Configurator,
+    defaultLanding: {
+      tab: 'Person',
+      sectionHeading: 'Add address and profile data to a user',
+    },
     allowedNavigation: [
       'Person',
       'Sticky Notes',
@@ -93,6 +110,10 @@ const roleScenarios: RoleScenario[] = [
   {
     role: 'User',
     credentials: temporaryAccounts.User,
+    defaultLanding: {
+      tab: 'Note Assignments',
+      sectionHeading: 'See how many sticky notes are assigned to each person',
+    },
     allowedNavigation: [
       'Sticky Notes',
       'Note Assignments',
@@ -148,7 +169,7 @@ for (const scenario of roleScenarios) {
   test(
     `${scenario.role} sees only permitted workspace navigation`,
     { tag: '@rbac' },
-    async ({ loginPage, workspacePage }) => {
+    async ({ page, loginPage, workspacePage }) => {
       await test.step(`Log in as ${scenario.role}`, async () => {
         await loginPage.navigate();
         await loginPage.login(
@@ -156,6 +177,18 @@ for (const scenario of roleScenarios) {
           scenario.credentials.password,
         );
       });
+
+      await test.step(
+        `Verify ${scenario.defaultLanding.tab} is the default landing`,
+        async () => {
+          await expect(
+            page.getByRole('heading', {
+              name: scenario.defaultLanding.sectionHeading,
+              exact: true,
+            }),
+          ).toBeVisible();
+        },
+      );
 
       await test.step('Verify allowed navigation', async () => {
         for (const label of scenario.allowedNavigation) {

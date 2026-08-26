@@ -88,6 +88,12 @@ test(
     await expect(
       page.getByRole('button', { name: 'Note Assignments' }),
     ).toBeVisible();
+    await expect(
+      page.getByRole('heading', {
+        name: 'See how many sticky notes are assigned to each person',
+        exact: true,
+      }),
+    ).toBeVisible();
   },
 );
 
