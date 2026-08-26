@@ -25,7 +25,9 @@ SQLite is embedded, so no separate database server is required.
 
 - Playwright with TypeScript and an HTML reporter
 - `LoginPage` Page Object Model with a custom `loginPage` fixture
+- `StickyNotesPage` Page Object Model with a custom `stickyNotesPage` fixture
 - API-based dynamic test-user creation and cleanup around a UI login flow
+- A Sticky Notes E2E scenario that creates a note through the UI, verifies the create API response and persistence after refresh, and cleans up the note through the API
 - `@smoke` test tagging
 - `desktop-chrome` and `mobile-chrome` projects, with Pixel 5 device settings for mobile
 - A setup authentication project implemented in `auth.setup.ts`
@@ -43,14 +45,18 @@ SQLite is embedded, so no separate database server is required.
 |-- fixtures/
 |   `-- index.ts
 |-- pages/
-|   `-- LoginPage.ts
+|   |-- LoginPage.ts
+|   `-- StickyNotesPage.ts
 |-- tests/
 |   |-- auth.setup.ts
 |   |-- authenticated.spec.ts
-|   `-- login.spec.ts
+|   |-- login.spec.ts
+|   `-- sticky-notes.spec.ts
 |-- skills/
 |   `-- playwright-reviewer/
 |-- .github/
+|   |-- instructions/
+|   |   `-- playwright-e2e.instructions.md
 |   `-- workflows/
 |       `-- playwright.yml
 |-- docs/
@@ -141,6 +147,8 @@ This starts both the API and frontend. Keep this terminal running while executin
 The setup project uses `auth.setup.ts` to authenticate the bootstrap admin through the UI and saves the resulting state under `playwright/.auth/`. The desktop and mobile projects depend on setup and reuse that state; `authenticated.spec.ts` verifies the reuse path. Generated authentication state is ignored by Git.
 
 `login.spec.ts` explicitly starts without stored authentication. It authenticates the admin through the API, creates a temporary `User` with a `crypto.randomUUID()` email for isolation across parallel projects, and logs that user in through the UI. Its `afterAll` hook removes the temporary user through the API.
+
+The training challenge uses `POST /api/users` and `DELETE /api/users/:id` as example endpoints. This implementation intentionally follows the application's real equivalent API contract, `POST /people` and `DELETE /people/:id`, rather than copying the example route names from the training slide.
 
 ## GitHub Actions CI
 
