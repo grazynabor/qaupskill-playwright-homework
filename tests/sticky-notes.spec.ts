@@ -28,95 +28,113 @@ test(
     const loginApiUrl = new URL('/auth/login', API_BASE_URL).toString();
     const notesApiUrl = new URL('/notes', API_BASE_URL);
 
-    const adminLoginResponse = await request.post(loginApiUrl, {
-      data: {
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
+    const adminToken = await test.step(
+      'Arrange: prepare API cleanup access',
+      async () => {
+        const adminLoginResponse = await request.post(loginApiUrl, {
+          data: {
+            email: ADMIN_EMAIL,
+            password: ADMIN_PASSWORD,
+          },
+        });
+
+        expect(adminLoginResponse.status()).toBe(200);
+
+        const adminLogin: LoginResponse = await adminLoginResponse.json();
+        const token = adminLogin.token;
+
+        expect(token).toBeTruthy();
+        expect(adminLogin.user.role).toBe('Admin');
+
+        return token;
       },
+    );
+
+    await test.step('Arrange: open Sticky Notes', async () => {
+      await stickyNotesPage.open();
+
+      await expect(stickyNotesPage.titleInput).toBeVisible();
+      await expect(stickyNotesPage.contentInput).toBeVisible();
+      await expect(stickyNotesPage.createStickyNoteButton).toBeVisible();
     });
-
-    expect(adminLoginResponse.status()).toBe(200);
-
-    const adminLogin: LoginResponse = await adminLoginResponse.json();
-    const adminToken = adminLogin.token;
-
-    expect(adminToken).toBeTruthy();
-    expect(adminLogin.user.role).toBe('Admin');
-
-    await stickyNotesPage.open();
-
-    await expect(stickyNotesPage.titleInput).toBeVisible();
-    await expect(stickyNotesPage.contentInput).toBeVisible();
-    await expect(stickyNotesPage.createStickyNoteButton).toBeVisible();
-
-    await stickyNotesPage.fillNote(title, content);
 
     let createdNoteId: number | undefined;
 
     try {
-      const createNoteResponsePromise = page.waitForResponse((response) => {
-        const responseUrl = new URL(response.url());
+      await test.step('Act: create sticky note', async () => {
+        await stickyNotesPage.fillNote(title, content);
 
-        return (
-          response.request().method() === 'POST' &&
-          responseUrl.origin === notesApiUrl.origin &&
-          responseUrl.pathname === notesApiUrl.pathname
-        );
+        const createNoteResponsePromise = page.waitForResponse((response) => {
+          const responseUrl = new URL(response.url());
+
+          return (
+            response.request().method() === 'POST' &&
+            responseUrl.origin === notesApiUrl.origin &&
+            responseUrl.pathname === notesApiUrl.pathname
+          );
+        });
+
+        await stickyNotesPage.submitNote();
+
+        const createNoteResponse = await createNoteResponsePromise;
+
+        expect(createNoteResponse.status()).toBe(201);
+
+        const createdNote: StickyNoteResponse = await createNoteResponse.json();
+
+        expect(createdNote.id).toBeGreaterThan(0);
+        createdNoteId = createdNote.id;
       });
 
-      await stickyNotesPage.submitNote();
+      await test.step('Assert: verify created note', async () => {
+        await expect(
+          page.getByText(`Created sticky note ${title}.`, { exact: true }),
+        ).toBeVisible();
+        await expect(stickyNotesPage.titleInput).toHaveValue('');
+        await expect(stickyNotesPage.contentInput).toHaveValue('');
 
-      const createNoteResponse = await createNoteResponsePromise;
+        const note = stickyNotesPage.noteByTitle(title);
 
-      expect(createNoteResponse.status()).toBe(201);
-
-      const createdNote: StickyNoteResponse = await createNoteResponse.json();
-
-      expect(createdNote.id).toBeGreaterThan(0);
-      createdNoteId = createdNote.id;
-
-      await expect(
-        page.getByText(`Created sticky note ${title}.`, { exact: true }),
-      ).toBeVisible();
-      await expect(stickyNotesPage.titleInput).toHaveValue('');
-      await expect(stickyNotesPage.contentInput).toHaveValue('');
-
-      let note = stickyNotesPage.noteByTitle(title);
-
-      await expect(note).toBeVisible();
-      await expect(note.getByText(content, { exact: true })).toBeVisible();
-      await expect(note.getByText('Unassigned', { exact: true })).toBeVisible();
-
-      const refreshResponsePromise = page.waitForResponse((response) => {
-        const responseUrl = new URL(response.url());
-
-        return (
-          response.request().method() === 'GET' &&
-          responseUrl.origin === notesApiUrl.origin &&
-          responseUrl.pathname === notesApiUrl.pathname
-        );
+        await expect(note).toBeVisible();
+        await expect(note.getByText(content, { exact: true })).toBeVisible();
+        await expect(
+          note.getByText('Unassigned', { exact: true }),
+        ).toBeVisible();
       });
 
-      await stickyNotesPage.refreshNotes();
+      await test.step('Assert: verify persistence after refresh', async () => {
+        const refreshResponsePromise = page.waitForResponse((response) => {
+          const responseUrl = new URL(response.url());
 
-      const refreshResponse = await refreshResponsePromise;
+          return (
+            response.request().method() === 'GET' &&
+            responseUrl.origin === notesApiUrl.origin &&
+            responseUrl.pathname === notesApiUrl.pathname
+          );
+        });
 
-      expect(refreshResponse.status()).toBe(200);
+        await stickyNotesPage.refreshNotes();
 
-      const refreshedNotes: StickyNoteResponse[] = await refreshResponse.json();
+        const refreshResponse = await refreshResponsePromise;
 
-      expect(refreshedNotes).toContainEqual(
-        expect.objectContaining({
-          id: createdNoteId,
-          title,
-          content,
-        }),
-      );
+        expect(refreshResponse.status()).toBe(200);
 
-      note = stickyNotesPage.noteByTitle(title);
+        const refreshedNotes: StickyNoteResponse[] =
+          await refreshResponse.json();
 
-      await expect(note).toBeVisible();
-      await expect(note.getByText(content, { exact: true })).toBeVisible();
+        expect(refreshedNotes).toContainEqual(
+          expect.objectContaining({
+            id: createdNoteId,
+            title,
+            content,
+          }),
+        );
+
+        const note = stickyNotesPage.noteByTitle(title);
+
+        await expect(note).toBeVisible();
+        await expect(note.getByText(content, { exact: true })).toBeVisible();
+      });
     } finally {
       if (createdNoteId !== undefined) {
         const deleteNoteResponse = await request.delete(
