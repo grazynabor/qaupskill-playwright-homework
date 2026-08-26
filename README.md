@@ -160,6 +160,8 @@ The HTML report is uploaded with an `always` condition when a report was produce
 - Artifact name: `playwright-report`
 - Retention: 14 days
 
+Failed tests retain screenshots and video, and the first CI retry records a Playwright trace. These diagnostics are included in the existing HTML report artifact. Open the report with `npx playwright show-report`; a downloaded trace can also be opened directly with `npx playwright show-trace path/to/trace.zip`.
+
 ## Optional Playwright Reviewer Skill
 
 `skills/playwright-reviewer/` contains an optional, read-only development and review aid for assessing Playwright and TypeScript test changes for correctness, maintainability, flakiness risk, security, and commit readiness. It is separate from runtime Playwright test execution, and GitHub Actions does not invoke it.
