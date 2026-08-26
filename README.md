@@ -139,6 +139,7 @@ This starts both the API and frontend. Keep this terminal running while executin
 | Desktop | `npx playwright test --project=desktop-chrome` |
 | Mobile | `npx playwright test --project=mobile-chrome` |
 | Playwright TypeScript check | `npm run check:playwright` |
+| Playwright lint | `npm run lint:playwright` |
 | List discovered tests | `npx playwright test --list` |
 | Open HTML report | `npx playwright show-report` |
 

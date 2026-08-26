@@ -10,13 +10,17 @@
     "build": "npm run build -w apps/api && npm run build -w apps/web",
     "check": "npm run check -w apps/api && npm run check -w apps/web",
     "check:playwright": "tsc --noEmit -p tsconfig.playwright.json",
-    "reset-db": "npm run reset-db -w apps/api"
+    "reset-db": "npm run reset-db -w apps/api",
+    "lint:playwright": "eslint \"tests/**/*.ts\" \"pages/**/*.ts\" \"fixtures/**/*.ts\" playwright.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
     "@types/node": "^25.6.0",
     "concurrently": "^9.2.1",
     "dotenv": "^17.4.2",
-    "typescript": "^5.9.3"
+    "eslint": "^10.9.1",
+    "eslint-plugin-playwright": "^2.11.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.68.0"
   }
 }
