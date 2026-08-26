@@ -155,6 +155,8 @@ The training challenge uses `POST /api/users` and `DELETE /api/users/:id` as exa
 
 `.github/workflows/playwright.yml` runs for pushes to `main`, pull requests targeting `main`, and manual `workflow_dispatch` runs. It uses Ubuntu and Node.js 24, installs dependencies plus Chromium system dependencies, runs Playwright type checking, starts the application, waits for API and frontend readiness, and executes the complete Playwright suite.
 
+GitHub Actions shows a concise run summary with the check and Playwright execution outcomes. When produced, the summary provides a direct link to the complete interactive Playwright HTML report in the `playwright-report` artifact.
+
 The HTML report is uploaded with an `always` condition when a report was produced, including after Playwright test failures:
 
 - Artifact name: `playwright-report`

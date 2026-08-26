@@ -41,9 +41,11 @@ jobs:
         run: npm ci
 
       - name: Type-check Playwright
+        id: typecheck
         run: npm run check:playwright
 
       - name: Lint Playwright
+        id: lint
         run: npm run lint:playwright
 
       - name: Install Chromium
@@ -56,6 +58,7 @@ jobs:
           printf 'JWT_SECRET=%s\n' "$jwt_secret" >> "$GITHUB_ENV"
 
       - name: Start services and run Playwright tests
+        id: playwright
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -111,6 +114,7 @@ jobs:
           npx playwright test
 
       - name: Upload Playwright report
+        id: upload-playwright-report
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
@@ -118,3 +122,46 @@ jobs:
           path: playwright-report/
           retention-days: 14
           if-no-files-found: warn
+
+      - name: Show Playwright report artifact link
+        if: ${{ always() }}
+        shell: bash
+        env:
+          PLAYWRIGHT_REPORT_URL: ${{ steps.upload-playwright-report.outputs.artifact-url }}
+        run: |
+          if [ -n "$PLAYWRIGHT_REPORT_URL" ]; then
+            echo "Playwright HTML report: $PLAYWRIGHT_REPORT_URL"
+          else
+            echo "Playwright HTML report artifact was not produced for this run."
+          fi
+
+      - name: Write Playwright job summary
+        if: ${{ always() }}
+        shell: bash
+        env:
+          PLAYWRIGHT_REPORT_URL: ${{ steps.upload-playwright-report.outputs.artifact-url }}
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          # Playwright Test Report
+
+          | Check | Status |
+          | --- | --- |
+          | TypeScript | `${{ steps.typecheck.outcome }}` |
+          | ESLint | `${{ steps.lint.outcome }}` |
+          | Playwright | `${{ steps.playwright.outcome }}` |
+
+          ## Browser projects
+
+          - Desktop Chrome (`desktop-chrome`)
+          - Mobile Chrome (`mobile-chrome`)
+
+          On failure, diagnostics include screenshots, retained video, and a trace on the first retry.
+
+          ## HTML report
+          EOF
+
+          if [ -n "$PLAYWRIGHT_REPORT_URL" ]; then
+            printf '[Download Playwright HTML report](%s)\n' "$PLAYWRIGHT_REPORT_URL" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Playwright HTML report artifact was not produced for this run.' >> "$GITHUB_STEP_SUMMARY"
+          fi
