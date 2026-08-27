@@ -124,7 +124,7 @@ GitHub Actions runs on pushes and pull requests to `main`, plus manual dispatch.
 
 The workflow checks the exact `/health` body and frontend root before Playwright; failures print application logs. List and HTML reporters are enabled, and `playwright-report/` is retained as `playwright-html-report` for 14 days. The Job Summary records outcomes, browser projects, diagnostics, and the report link.
 
-Diagnostics are screenshots on failure, retained video on failure, and trace on the first retry. `forbidOnly` is not configured and is not an existing gate.
+Diagnostics are screenshots on failure, retained video on failure, and trace on the first retry. `forbidOnly: !!process.env.CI` prevents accidental focused tests in CI.
 
 ## 9. Known Gaps and Requirement Clarifications
 
@@ -143,7 +143,7 @@ The documented contract requires server-side token invalidation, but the current
 ## 10. Proposed Next Steps
 
 1. Resolve the logout implementation mismatch, then extend the existing session E2E test to verify server-side token invalidation.
-2. Add `forbidOnly` as a CI configuration safeguard against accidental focused tests; this improves test governance, not functional coverage.
-3. Reassess residual risk and decide whether one representative user-management E2E journey adds sufficient value.
+2. No additional E2E scenario is currently required.
+3. Keep one representative user-management E2E journey as a future option if residual risk or project scope justifies it.
 
 Further tests should be driven by product risk and requirement value, not raw test count.

@@ -6,6 +6,7 @@ const authFile = path.resolve(__dirname, 'playwright', '.auth', 'admin.json');
 
 export default defineConfig({
   testDir: './tests',
+  forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: [
     ['list'],
