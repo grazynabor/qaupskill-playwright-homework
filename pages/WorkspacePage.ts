@@ -45,4 +45,8 @@ export class WorkspacePage {
       }),
     };
   }
+
+  async openSection(label: WorkspaceNavigationLabel): Promise<void> {
+    await this.navigationItems[label].click();
+  }
 }

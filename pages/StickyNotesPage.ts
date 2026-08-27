@@ -50,6 +50,12 @@ export class StickyNotesPage {
     await this.refreshButton.click();
   }
 
+  async markNoteDone(title: string): Promise<void> {
+    await this.noteByTitle(title)
+      .getByRole('button', { name: 'Done', exact: true })
+      .click();
+  }
+
   noteByTitle(title: string): Locator {
     return this.page.getByRole('article').filter({
       has: this.page.getByRole('heading', { name: title, exact: true }),
