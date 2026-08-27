@@ -10,9 +10,14 @@ export type WorkspaceNavigationLabel =
   | 'Archive';
 
 export class WorkspacePage {
+  readonly logoutButton: Locator;
   readonly navigationItems: Record<WorkspaceNavigationLabel, Locator>;
 
   constructor(page: Page) {
+    this.logoutButton = page.getByRole('button', {
+      name: 'Logout',
+      exact: true,
+    });
     const workspaceTabs = page.getByRole('tablist', {
       name: 'Workspace tabs',
     });
@@ -48,5 +53,9 @@ export class WorkspacePage {
 
   async openSection(label: WorkspaceNavigationLabel): Promise<void> {
     await this.navigationItems[label].click();
+  }
+
+  async logout(): Promise<void> {
+    await this.logoutButton.click();
   }
 }
