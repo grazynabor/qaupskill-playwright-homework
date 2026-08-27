@@ -24,8 +24,7 @@ SQLite is embedded, so no separate database server is required.
 ## Test Automation Highlights
 
 - Playwright with TypeScript and an HTML reporter
-- `LoginPage` Page Object Model with a custom `loginPage` fixture
-- `StickyNotesPage` Page Object Model with a custom `stickyNotesPage` fixture
+- `LoginPage`, `WorkspacePage`, `StickyNotesPage`, and `ArchivePage` Page Objects supplied through custom fixtures
 - API-based dynamic test-user creation and cleanup around a UI login flow
 - A Sticky Notes E2E scenario that creates a note through the UI, verifies the create API response and persistence after refresh, and cleans up the note through the API
 - `@smoke` test tagging
@@ -45,12 +44,16 @@ SQLite is embedded, so no separate database server is required.
 |-- fixtures/
 |   `-- index.ts
 |-- pages/
+|   |-- ArchivePage.ts
 |   |-- LoginPage.ts
-|   `-- StickyNotesPage.ts
+|   |-- StickyNotesPage.ts
+|   `-- WorkspacePage.ts
 |-- tests/
 |   |-- auth.setup.ts
 |   |-- authenticated.spec.ts
 |   |-- login.spec.ts
+|   |-- rbac.spec.ts
+|   |-- session.spec.ts
 |   `-- sticky-notes.spec.ts
 |-- skills/
 |   `-- playwright-reviewer/
@@ -60,7 +63,9 @@ SQLite is embedded, so no separate database server is required.
 |   `-- workflows/
 |       `-- playwright.yml
 |-- docs/
-|   `-- requirements.md
+|   |-- requirements.md
+|   `-- test-strategy.md
+|-- eslint.config.mjs
 |-- playwright.config.ts
 `-- tsconfig.playwright.json
 ```
@@ -153,7 +158,7 @@ The training challenge uses `POST /api/users` and `DELETE /api/users/:id` as exa
 
 ## GitHub Actions CI
 
-`.github/workflows/playwright.yml` runs for pushes to `main`, pull requests targeting `main`, and manual `workflow_dispatch` runs. It uses Ubuntu and Node.js 24, installs dependencies plus Chromium system dependencies, runs Playwright type checking, starts the application, waits for API and frontend readiness, and executes the complete Playwright suite.
+`.github/workflows/playwright.yml` runs for pushes to `main`, pull requests targeting `main`, and manual `workflow_dispatch` runs. It uses Ubuntu and Node.js 24, installs dependencies plus Chromium system dependencies, runs Playwright type checking and linting, starts the application, waits for API and frontend readiness, and executes the complete Playwright suite.
 
 GitHub Actions shows a concise run summary with the check and Playwright execution outcomes. When produced, the summary provides a direct link to the complete interactive Playwright HTML report in the `playwright-html-report` artifact.
 
@@ -171,6 +176,7 @@ Failed tests retain screenshots and video, and the first CI retry records a Play
 ## Documentation
 
 - [Functional requirements](docs/requirements.md)
+- [Playwright E2E test strategy](docs/test-strategy.md)
 - Swagger UI: `http://localhost:4000/docs`
 
 ## Reset the Local Database
