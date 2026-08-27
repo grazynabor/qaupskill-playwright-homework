@@ -21,13 +21,15 @@ The repository does not prove these lower-level suites exist; recommendations id
 
 ## 3. Current Automated Coverage
 
-Custom fixtures supply `LoginPage`, `WorkspacePage`, and `StickyNotesPage`. `auth.setup.ts` logs the bootstrap Admin in through the UI and writes `storageState` for both browser projects. `authenticated.spec.ts` proves restoration: after reload, `/auth/me` returns `200` and authenticated UI remains visible.
+Custom fixtures supply `LoginPage`, `WorkspacePage`, `StickyNotesPage`, and `ArchivePage`. `auth.setup.ts` logs the bootstrap Admin in through the UI and writes `storageState` for both browser projects. `authenticated.spec.ts` proves restoration: after reload, `/auth/me` returns `200` and authenticated UI remains visible.
 
 The `@smoke` scenario clears inherited storage, creates a unique temporary User through the Admin API, logs in through the UI, and verifies identity, Logout, User navigation, and the default Note Assignments section. API creation and cleanup make data deterministic; they do not cover Create User or Delete User UI requirements.
 
 The RBAC suite creates unique Configurator and User accounts by API, logs in through the UI as all three roles, and asserts default landing content, expected navigation, and absent restricted tabs. This is navigation evidence, not proof of every permitted operation.
 
-The Sticky Note scenario creates one unassigned note as Admin through the UI. It verifies the `POST /notes` response, feedback, cleared inputs, visible note state, and persistence in the refresh `GET /notes` response and board. A `finally` block performs API cleanup. Assignment, color selection, completion, Archive, limits, and UI deletion are not exercised.
+The first Sticky Note scenario creates one unassigned note as Admin through the UI. It verifies the `POST /notes` response, feedback, cleared inputs, visible note state, and persistence in the refresh `GET /notes` response and board. Assignment, color selection, limits, and UI deletion are not exercised.
+
+The lifecycle scenario creates a unique note through the UI, verifies the `201` response and active card, marks that exact note done while synchronizing on `PATCH /notes/:id/done`, and verifies the `200` payload and success feedback. It then proves the note leaves the active board and, using `WorkspacePage` and `ArchivePage`, appears in Archive with the same title and content. API deletion by captured ID runs in `finally` for isolation; the scenario covers one allowed Admin path, not the permission matrix or every Archive invariant.
 
 Dependent tests run in Desktop Chrome and Mobile Chrome (Pixel 5) projects. This is cross-viewport Chromium coverage, not cross-browser coverage.
 
@@ -44,7 +46,7 @@ Dependent tests run in Desktop Chrome and Mobile Chrome (Pixel 5) projects. This
 | Authentication | Logout clears local state and invalidates the server token | Not covered | Logout is only asserted visible | High | Use E2E to verify UI/local session clearing and the logged-out state after reload; verify rejection of the invalidated token at API/session integration level. |
 | Authentication | Token expires after eight hours | Not covered | None | Low | Test expiry configuration and rejection below E2E; do not wait in a browser. |
 | RBAC / navigation | User permissions | Partially covered | `rbac.spec.ts` covers visible/hidden tabs and default landing, not actions | High | Retain navigation checks; add action coverage only for selected high-risk journeys. |
-| RBAC / navigation | Admin permissions | Partially covered | Navigation and landing are covered; note creation is one Admin path | High | Avoid duplicating every User path as Admin. |
+| RBAC / navigation | Admin permissions | Partially covered | Navigation and landing plus note creation and completion are covered for Admin | High | Avoid duplicating every User path as Admin. |
 | RBAC / navigation | Configurator permissions | Partially covered | Navigation and landing only | High | Add action evidence only where Configurator rules materially differ. |
 | RBAC / navigation | Restricted tabs are hidden | Covered | `rbac.spec.ts` asserts absent controls for User and Configurator | High | Retain as a compact authorization signal. |
 | RBAC / navigation | Default landing tab for each role | Covered | Admin Users, Configurator Person, User Note Assignments asserted in `rbac.spec.ts` | High | Retain. |
@@ -56,19 +58,19 @@ Dependent tests run in Desktop Chrome and Mobile Chrome (Pixel 5) projects. This
 | Users | Delete confirmation, dismissal, errors, success, and data side effects | Not covered | None | Medium | Split modal behavior to component tests and destructive side effects to API integration tests; keep at most one E2E happy path. |
 | Person | Section visibility by role | Covered | Person control visible for Admin/Configurator and absent for User in `rbac.spec.ts` | Medium | Retain in RBAC matrix. |
 | Person | Edit and persist profile data through the modal | Not covered | None | Medium | Candidate only if profile editing is business-critical; validate field permutations below E2E. |
-| Sticky Notes | Authenticated roles can create a note and redirect to the board | Partially covered | `sticky-notes.spec.ts` covers one unassigned Admin creation from the board | High | Retain; do not duplicate for every role unless permission risk changes. |
+| Sticky Notes | Authenticated roles can create a note and redirect to the board | Partially covered | Both `sticky-notes.spec.ts` scenarios create as Admin from the active board; other roles are not exercised | High | Retain; do not duplicate for every role unless permission risk changes. |
 | Sticky Notes | Title and content validation | Not covered | None | Low | Cover boundaries and whitespace rules below E2E. |
 | Sticky Notes | Five allowed colors | Not covered | Default color is not asserted and selection is not exercised | Low | Prefer component/API parameterized tests. |
 | Sticky Notes | Assignment is optional and may target an existing user | Partially covered | Created note is asserted as `Unassigned`; assigned creation is absent | Medium | Add assignment only as part of a higher-value assignment journey. |
-| Sticky Notes | Active board shows open notes only | Not covered | One new open note is visible; no done-note exclusion is asserted | High | Cover through the lifecycle-to-Archive scenario. |
+| Sticky Notes | Active board shows open notes only | Partially covered | Lifecycle test verifies its completed note disappears from the active board | High | Retain the lifecycle evidence; broader negative invariants belong below E2E. |
 | Sticky Notes | Maximum of ten open notes; done notes do not consume capacity | Not covered | None | Medium | Test limit rules at API level; retain one UI boundary signal only if UX handling is risky. |
 | Sticky Notes | Header shows open count versus limit | Not covered | None | Medium | Consider with a lifecycle or limit scenario, not as a standalone E2E. |
-| Sticky Notes | Mark a note as done with permitted ownership/role | Not covered | None | High | Cover the primary allowed path in the lifecycle scenario; permission matrix belongs at API level. |
-| Sticky Notes | Done note leaves active board and moves to Archive | Not covered | None | High | Highest-value next E2E journey. |
+| Sticky Notes | Mark a note as done with permitted ownership/role | Partially covered | Lifecycle test covers one allowed Admin path and verifies the exact `PATCH` succeeds with `200` | High | Retain the primary allowed path; permission matrix belongs at API level. |
+| Sticky Notes | Done note leaves active board and moves to Archive | Covered | Lifecycle test verifies the same note leaves the active board and appears in Archive with its title and content | High | Retain as the critical Sticky Note state transition. |
 | Sticky Notes | Delete permissions for creator, Admin, and Configurator | Not covered | Admin API cleanup does not exercise UI behavior or permission rules | Medium | Prefer API authorization tests; add one UI path only if needed. |
 | Sticky Notes | Note remains visible and correct after manual refresh | Covered | `sticky-notes.spec.ts` asserts GET response and rendered note after Refresh | High | Retain. |
 | Archive | Section visibility for Admin/Configurator and restriction for User | Covered | `rbac.spec.ts` | High | Retain. |
-| Archive | Contains done notes only | Not covered | None | High | Cover through the lifecycle scenario. |
+| Archive | Contains done notes only | Partially covered | Lifecycle test verifies one completed note appears in Archive with the expected title and content | High | Retain this positive path; test the negative open-note invariant below E2E. |
 | Archive | Header shows archived count | Not covered | None | Medium | Assert within the lifecycle scenario if deterministic. |
 | Note Assignments | Section visibility for all roles | Covered | `rbac.spec.ts`; User default section also asserted in `login.spec.ts` | Medium | Retain in RBAC matrix. |
 | Note Assignments | Only people with assigned open notes appear; unassigned notes are excluded | Not covered | None | Medium | Prefer component/API data-shaping tests; consider one representative E2E dataset later. |
@@ -85,9 +87,9 @@ Dependent tests run in Desktop Chrome and Mobile Chrome (Pixel 5) projects. This
 
 ## 5. Risk-Based Prioritization
 
-The highest-value next E2E scenario is the Sticky Note lifecycle: create a unique note, mark it done, assert removal from the active board, open Archive, and assert the note there. It connects a material state transition and two sections; deterministic open/archive counters can be asserted in the same journey.
+The Sticky Note lifecycle is implemented for one allowed Admin path: a unique note crosses UI creation, the done API transition, active-board removal, and Archive rendering. Permission permutations, counters, and broader active/Archive invariants remain outside that scenario.
 
-Second is the logout/session lifecycle with an isolated temporary account: UI login, logout, assert authenticated UI and local state are cleared, reload, and confirm the user remains logged out. Verify server-side invalidation at API/session integration level.
+The highest-value next E2E gap is the logout/session lifecycle with an isolated temporary account: UI login, logout, assert authenticated UI and local state are cleared, reload, and confirm the user remains logged out. Verify server-side invalidation at API/session integration level.
 
 One UI user-management scenario may add value across form, role, persistence, list, and confirmation behavior. Select the riskiest transition—create then role change or delete—rather than automating every Users requirement.
 
@@ -134,9 +136,8 @@ The documented color list prefixes four values with `#`, but lists `4d5b1f` diff
 
 ## 10. Proposed Next Steps
 
-1. Add the Sticky Note create-to-done-to-Archive lifecycle.
-2. Add an isolated login-to-logout-to-reload session lifecycle.
-3. Add `forbidOnly` as a CI configuration safeguard against accidental focused tests; this improves test governance, not functional coverage.
-4. Reassess residual risks and whether one user-management journey is justified after those additions.
+1. Add an isolated login-to-logout-to-reload session lifecycle.
+2. Add `forbidOnly` as a CI configuration safeguard against accidental focused tests; this improves test governance, not functional coverage.
+3. Reassess residual risks and decide whether one user-management E2E journey adds enough value.
 
 Further tests should be driven by product risk and requirement value, not raw test count.
