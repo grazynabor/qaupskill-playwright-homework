@@ -25,6 +25,8 @@ Custom fixtures supply `LoginPage`, `WorkspacePage`, `StickyNotesPage`, and `Arc
 
 The `@smoke` scenario clears inherited storage, creates a unique temporary User through the Admin API, logs in through the UI, and verifies identity, Logout, User navigation, and the default Note Assignments section. API creation and cleanup make data deterministic; they do not cover Create User or Delete User UI requirements.
 
+The isolated logout scenario uses explicitly empty browser `storageState`, creates a unique temporary User through the Admin API, logs in and out through the UI, and verifies the unauthenticated state persists after reload. Deterministic cleanup runs in `finally`; the browser neither uses nor invalidates the shared Admin state. This covers the observable client-side session lifecycle, not server-side token invalidation.
+
 The RBAC suite creates unique Configurator and User accounts by API, logs in through the UI as all three roles, and asserts default landing content, expected navigation, and absent restricted tabs. This is navigation evidence, not proof of every permitted operation.
 
 The first Sticky Note scenario creates one unassigned note as Admin through the UI. It verifies the `POST /notes` response, feedback, cleared inputs, visible note state, and persistence in the refresh `GET /notes` response and board. Assignment, color selection, limits, and UI deletion are not exercised.
@@ -43,7 +45,7 @@ Dependent tests run in Desktop Chrome and Mobile Chrome (Pixel 5) projects. This
 | Authentication | Email is normalized to lowercase | Not covered | None; current credentials are already lowercase | Medium | Test at the layer that owns normalization; retain one UI case if client-side normalization is part of the user-facing contract. |
 | Authentication | Session restoration after reload with `/auth/me` verification | Covered | `authenticated.spec.ts` asserts `/auth/me` `200` and authenticated UI after reload | High | Retain. |
 | Authentication | Invalid or expired stored token is removed | Not covered | None | Medium | Prefer API/session integration coverage plus one browser check if regressions justify it. |
-| Authentication | Logout clears local state and invalidates the server token | Not covered | Logout is only asserted visible | High | Use E2E to verify UI/local session clearing and the logged-out state after reload; verify rejection of the invalidated token at API/session integration level. |
+| Authentication | Logout clears local state and invalidates the server token | Partially covered | `session.spec.ts` covers UI logout, client-side session clearing, and the logged-out state after reload; the frontend does not call `/auth/logout` | High | Server-side token invalidation remains unmet. After an application fix, extend the same scenario to assert `POST /auth/logout` returns `204` and the old token is rejected by `GET /auth/me` with `401`. |
 | Authentication | Token expires after eight hours | Not covered | None | Low | Test expiry configuration and rejection below E2E; do not wait in a browser. |
 | RBAC / navigation | User permissions | Partially covered | `rbac.spec.ts` covers visible/hidden tabs and default landing, not actions | High | Retain navigation checks; add action coverage only for selected high-risk journeys. |
 | RBAC / navigation | Admin permissions | Partially covered | Navigation and landing plus note creation and completion are covered for Admin | High | Avoid duplicating every User path as Admin. |
@@ -89,7 +91,7 @@ Dependent tests run in Desktop Chrome and Mobile Chrome (Pixel 5) projects. This
 
 The Sticky Note lifecycle is implemented for one allowed Admin path: a unique note crosses UI creation, the done API transition, active-board removal, and Archive rendering. Permission permutations, counters, and broader active/Archive invariants remain outside that scenario.
 
-The highest-value next E2E gap is the logout/session lifecycle with an isolated temporary account: UI login, logout, assert authenticated UI and local state are cleared, reload, and confirm the user remains logged out. Verify server-side invalidation at API/session integration level.
+The isolated logout/session E2E now covers UI login, logout, client-side session clearing, and the logged-out state after reload. Completing the documented server-side invalidation requirement is blocked by current application behavior because the frontend does not call `/auth/logout`; after the application fix, extend the existing scenario to verify the logout response and rejection of the old token.
 
 One UI user-management scenario may add value across form, role, persistence, list, and confirmation behavior. Select the riskiest transition—create then role change or delete—rather than automating every Users requirement.
 
@@ -103,8 +105,8 @@ The suite currently demonstrates these practices:
 - Locators use labels, roles, accessible names, headings, and visible text.
 - Web-first assertions and response synchronization avoid arbitrary sleeps; ESLint rejects `waitForTimeout()` and requires web-first assertions.
 - APIs arrange and remove deterministic data while UUID-based emails and note titles reduce collisions; the journey under test stays in the UI.
-- Login and RBAC scenarios explicitly opt out of saved state; authenticated scenarios intentionally reuse it.
-- Cleanup runs in `afterAll` for accounts and `finally` for the note; scenarios do not rely on test order.
+- Login, RBAC, and logout scenarios explicitly opt out of saved state; authenticated scenarios intentionally reuse it.
+- Cleanup runs in `afterAll` for shared setup accounts and in `finally` for isolated session and note data; scenarios do not rely on test order.
 
 ## 7. Execution Matrix
 
@@ -134,10 +136,14 @@ The requirements allow all authenticated users to mark notes done in the UI, whi
 
 The documented color list prefixes four values with `#`, but lists `4d5b1f` differently. The current implementation appears to use `#4d5b1f`; this remains a documentation clarification candidate rather than a replacement contract or test assumption.
 
+### Logout implementation gap
+
+The documented contract requires server-side token invalidation, but the current UI only clears local authentication state and does not call `POST /auth/logout`. The E2E suite therefore verifies the observable client-side logout lifecycle only. Closing the requirement requires an application change; afterward the test should verify `POST /auth/logout` returns `204` and rejection of the previous token by `GET /auth/me` returns `401`.
+
 ## 10. Proposed Next Steps
 
-1. Add an isolated login-to-logout-to-reload session lifecycle.
+1. Resolve the logout implementation mismatch, then extend the existing session E2E test to verify server-side token invalidation.
 2. Add `forbidOnly` as a CI configuration safeguard against accidental focused tests; this improves test governance, not functional coverage.
-3. Reassess residual risks and decide whether one user-management E2E journey adds enough value.
+3. Reassess residual risk and decide whether one representative user-management E2E journey adds sufficient value.
 
 Further tests should be driven by product risk and requirement value, not raw test count.
