@@ -143,7 +143,7 @@ The documented contract requires server-side token invalidation, but the current
 ## 10. Proposed Next Steps
 
 1. Resolve the logout implementation mismatch, then extend the existing session E2E test to verify server-side token invalidation.
-2. No additional E2E scenario is currently required.
+2. No additional E2E scenario is required to satisfy the current homework scope. Further E2E coverage should be added only when justified by product risk.
 3. Keep one representative user-management E2E journey as a future option if residual risk or project scope justifies it.
 
 Further tests should be driven by product risk and requirement value, not raw test count.
