@@ -1,6 +1,5 @@
 import { test, expect } from '../fixtures';
-
-const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:4000';
+import { API_BASE_URL } from './helpers/api';
 
 test('restores the authenticated session after reload', async ({ page }) => {
   const authMeApiUrl = new URL('/auth/me', API_BASE_URL);

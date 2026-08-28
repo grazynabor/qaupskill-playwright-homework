@@ -26,6 +26,7 @@ export default [
     files: playwrightFiles,
     rules: {
       ...playwright.configs['flat/recommended'].rules,
+      // Deterministic conditionals are intentional for cleanup and static table-driven scenarios, not runtime UI-state branching.
       'playwright/no-conditional-expect': 'off',
       'playwright/no-conditional-in-test': 'off',
       'playwright/no-wait-for-timeout': 'error',
