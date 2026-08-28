@@ -1,10 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../fixtures';
 import type { WorkspaceNavigationLabel } from '../pages/WorkspacePage';
+import {
+  ADMIN_CREDENTIALS,
+  authenticateAdmin,
+  createPerson,
+  deletePerson,
+  type PersonRole,
+} from './helpers/api';
 
-const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:4000';
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@qaupskill.local';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'Admin123!';
 const TEMPORARY_ACCOUNT_PASSWORD = 'Test123!';
 
 test.use({
@@ -14,21 +18,7 @@ test.use({
   },
 });
 
-type Role = 'User' | 'Admin' | 'Configurator';
-type TemporaryRole = Exclude<Role, 'Admin'>;
-
-type PersonResponse = {
-  id: number;
-  fullName: string;
-  email: string;
-  role: Role;
-  createdAt: string;
-};
-
-type LoginResponse = {
-  token: string;
-  user: PersonResponse;
-};
+type TemporaryRole = Exclude<PersonRole, 'Admin'>;
 
 type Credentials = {
   email: string;
@@ -44,7 +34,7 @@ type DefaultLandingExpectation = {
 };
 
 type RoleScenario = {
-  role: Role;
+  role: PersonRole;
   credentials: Credentials;
   defaultLanding: DefaultLandingExpectation;
   allowedNavigation: WorkspaceNavigationLabel[];
@@ -72,10 +62,7 @@ const temporaryAccounts: Record<
 const roleScenarios: RoleScenario[] = [
   {
     role: 'Admin',
-    credentials: {
-      email: ADMIN_EMAIL,
-      password: ADMIN_PASSWORD,
-    },
+    credentials: ADMIN_CREDENTIALS,
     defaultLanding: {
       tab: 'Users',
       sectionHeading: 'Manage existing user accounts',
@@ -127,36 +114,11 @@ let adminToken: string;
 const temporaryAccountIds: Partial<Record<TemporaryRole, number>> = {};
 
 test.beforeAll(async ({ request }) => {
-  const adminLoginResponse = await request.post(`${API_BASE_URL}/auth/login`, {
-    data: {
-      email: ADMIN_EMAIL,
-      password: ADMIN_PASSWORD,
-    },
-  });
-
-  expect(adminLoginResponse.status()).toBe(200);
-
-  const adminLogin: LoginResponse = await adminLoginResponse.json();
-  adminToken = adminLogin.token;
-
-  expect(adminToken).toBeTruthy();
-  expect(adminLogin.user.role).toBe('Admin');
+  adminToken = await authenticateAdmin(request);
 
   for (const role of ['Configurator', 'User'] as const) {
     const account = temporaryAccounts[role];
-    const createAccountResponse = await request.post(
-      `${API_BASE_URL}/people`,
-      {
-        headers: {
-          Authorization: `Bearer ${adminToken}`,
-        },
-        data: account,
-      },
-    );
-
-    expect(createAccountResponse.status()).toBe(201);
-
-    const createdAccount: PersonResponse = await createAccountResponse.json();
+    const createdAccount = await createPerson(request, adminToken, account);
     temporaryAccountIds[role] = createdAccount.id;
 
     expect(createdAccount.id).toBeGreaterThan(0);
@@ -215,13 +177,10 @@ test.afterAll(async ({ request }) => {
       continue;
     }
 
-    const deleteAccountResponse = await request.delete(
-      `${API_BASE_URL}/people/${accountId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${adminToken}`,
-        },
-      },
+    const deleteAccountResponse = await deletePerson(
+      request,
+      adminToken,
+      accountId,
     );
 
     expect.soft(

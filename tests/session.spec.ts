@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '../fixtures';
-
-const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:4000';
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@qaupskill.local';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'Admin123!';
+import {
+  authenticateAdmin,
+  createPerson,
+  deletePerson,
+} from './helpers/api';
 
 test.use({
   storageState: {
@@ -11,21 +12,6 @@ test.use({
     origins: [],
   },
 });
-
-type Role = 'User' | 'Admin' | 'Configurator';
-
-type PersonResponse = {
-  id: number;
-  fullName: string;
-  email: string;
-  role: Role;
-  createdAt: string;
-};
-
-type LoginResponse = {
-  token: string;
-  user: PersonResponse;
-};
 
 test(
   'user can log out and remains logged out after reload',
@@ -41,37 +27,13 @@ test(
 
     try {
       await test.step('Arrange: create isolated user', async () => {
-        const adminLoginResponse = await request.post(
-          `${API_BASE_URL}/auth/login`,
-          {
-            data: {
-              email: ADMIN_EMAIL,
-              password: ADMIN_PASSWORD,
-            },
-          },
+        adminToken = await authenticateAdmin(request);
+
+        const createdUser = await createPerson(
+          request,
+          adminToken,
+          temporaryUser,
         );
-
-        expect(adminLoginResponse.status()).toBe(200);
-
-        const adminLogin: LoginResponse = await adminLoginResponse.json();
-        adminToken = adminLogin.token;
-
-        expect(adminToken).toBeTruthy();
-        expect(adminLogin.user.role).toBe('Admin');
-
-        const createUserResponse = await request.post(
-          `${API_BASE_URL}/people`,
-          {
-            headers: {
-              Authorization: `Bearer ${adminToken}`,
-            },
-            data: temporaryUser,
-          },
-        );
-
-        expect(createUserResponse.status()).toBe(201);
-
-        const createdUser: PersonResponse = await createUserResponse.json();
         temporaryUserId = createdUser.id;
 
         expect(createdUser.id).toBeGreaterThan(0);
@@ -121,13 +83,10 @@ test(
       );
     } finally {
       if (temporaryUserId !== undefined && adminToken) {
-        const deleteUserResponse = await request.delete(
-          `${API_BASE_URL}/people/${temporaryUserId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${adminToken}`,
-            },
-          },
+        const deleteUserResponse = await deletePerson(
+          request,
+          adminToken,
+          temporaryUserId,
         );
 
         expect.soft(

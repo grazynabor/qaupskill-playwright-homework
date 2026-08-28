@@ -1,48 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { type APIRequestContext } from '@playwright/test';
 import { test, expect } from '../fixtures';
-
-const API_BASE_URL = process.env.API_BASE_URL ?? 'http://localhost:4000';
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@qaupskill.local';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? 'Admin123!';
-
-type Role = 'User' | 'Admin' | 'Configurator';
-
-type LoginResponse = {
-  token: string;
-  user: {
-    role: Role;
-  };
-};
+import { API_BASE_URL, authenticateAdmin } from './helpers/api';
 
 type StickyNoteResponse = {
   id: number;
   title: string;
   content: string;
   isDone: boolean;
-};
-
-const authenticateAdminForApi = async (
-  request: APIRequestContext,
-): Promise<string> => {
-  const adminLoginResponse = await request.post(
-    new URL('/auth/login', API_BASE_URL).toString(),
-    {
-      data: {
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
-      },
-    },
-  );
-
-  expect(adminLoginResponse.status()).toBe(200);
-
-  const adminLogin: LoginResponse = await adminLoginResponse.json();
-
-  expect(adminLogin.token).toBeTruthy();
-  expect(adminLogin.user.role).toBe('Admin');
-
-  return adminLogin.token;
 };
 
 test(
@@ -54,7 +18,7 @@ test(
 
     const adminToken = await test.step(
       'Arrange: prepare API cleanup access',
-      async () => authenticateAdminForApi(request),
+      async () => authenticateAdmin(request),
     );
 
     await test.step('Arrange: open Sticky Notes', async () => {
@@ -178,7 +142,7 @@ test(
 
     const adminToken = await test.step(
       'Arrange: prepare API cleanup access',
-      async () => authenticateAdminForApi(request),
+      async () => authenticateAdmin(request),
     );
 
     let createdNoteId: number | undefined;
